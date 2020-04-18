@@ -1,0 +1,29 @@
+plugins {
+    id 'java-gradle-plugin'
+    id 'groovy'
+    id "com.gradle.plugin-publish" version "0.11.0"
+}
+
+group 'nl.elec332.gradle'
+version '1.0-Alpha'
+
+sourceCompatibility = targetCompatibility = 1.8
+
+gradlePlugin {
+
+    plugins {
+        ossrhPlugin {
+            id = 'nl.elec332.gradle.ossrhplugin'
+            implementationClass = 'nl.elec332.gradle.ossrhplugin.OSSRHPlugin'
+            displayName = 'Gradle Plugin for easy OSSRH deplyment'
+            description = "A Gradle plugin to simplify the deployment of artifacts to OSSRH and Maven Central"
+        }
+    }
+
+}
+
+pluginBundle {
+    website = 'https://github.com/Elec332/GradleOSSRHPlugin'
+    vcsUrl = 'https://github.com/Elec332/GradleOSSRHPlugin.git'
+    tags = ['java', 'OSSRH', 'maven', 'central', 'sonatype']
+}
