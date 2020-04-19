@@ -4,6 +4,7 @@ import groovy.lang.Closure;
 import org.gradle.api.Project;
 
 import javax.inject.Inject;
+import java.util.Locale;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,6 +29,7 @@ public class OSSRHExtension {
                 return false;
             }
         };
+        this.testFilter = version -> version.toLowerCase(Locale.ROOT).contains("-test") || version.contains("TEST");
     }
 
     public static final String LATEST_VERSION = "LATEST";
@@ -47,6 +49,15 @@ public class OSSRHExtension {
 
     @Inject
     public String snapshotRepositoryUrl = "https://oss.sonatype.org/content/repositories/snapshots/";
+
+    @Inject
+    public boolean testLocalRepo = false;
+
+    @Inject
+    public Predicate<String> testFilter;
+
+    @Inject
+    public String localRepository = null;
 
     @Inject
     public String name;

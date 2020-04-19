@@ -7,11 +7,13 @@ import nl.elec332.gradle.util.Utils
 import org.gradle.api.Project
 import org.gradle.api.artifacts.maven.MavenDeployer
 
+import java.util.function.Supplier
+
 /**
  * Created by Elec332 on 18-4-2020
  */
 class MavenConfigurator {
-    
+
     static void configure(Project project, Closure closure, String name) {
         GroovyHooks.configureMaven(project, { maven ->
             maven.pom.project {
@@ -38,8 +40,8 @@ class MavenConfigurator {
         }, "contributors")
     }
 
-    static void configureMaven(MavenDeployer deployer, OSSRHExtension extension, Project project) {
-        validateExtension(extension, project)
+    static void configureMaven(MavenDeployer deployer, OSSRHExtension extension, Project project, Supplier<String> localMaven) {
+        validateExtension(extension, project, localMaven)
         boolean userPass = false
         String user, pass
         if (project.hasProperty(OSSRHPlugin.OSSRH_USERNAME_PROPERTY) && project.hasProperty(OSSRHPlugin.OSSRH_USERNAME_PROPERTY)) {
@@ -57,7 +59,9 @@ class MavenConfigurator {
         }
 
         String repo = extension.repositoryUrl;
-        if (!Utils.isNullOrEmpty(extension.snapshotRepositoryUrl)) {
+        if (extension.testLocalRepo || extension.testFilter != null && extension.testFilter.test((String) project.version)) {
+            repo = extension.localRepository
+        } else if (!Utils.isNullOrEmpty(extension.snapshotRepositoryUrl)) {
             if (extension.useSnapshotRepo) {
                 deployer.repository(url: extension.snapshotRepositoryUrl) {
                     if (userPass) {
@@ -112,7 +116,7 @@ class MavenConfigurator {
     }
 
     @VisibilityOptions(Visibility.PRIVATE)
-    static void validateExtension(OSSRHExtension extension, Project project) {
+    static void validateExtension(OSSRHExtension extension, Project project, Supplier<String> localMaven) {
         if (Utils.isNullOrEmpty(extension.repositoryUrl)) {
             throw new MissingPropertyException("Maven repo URL not defined!")
         }
@@ -127,6 +131,9 @@ class MavenConfigurator {
         }
         if (Utils.isNullOrEmpty(extension.description)) {
             throw new MissingPropertyException("No project description provided!")
+        }
+        if (Utils.isNullOrEmpty(extension.localRepository)) {
+            extension.localRepository = localMaven.get()
         }
 
         boolean hasGitHub = !Utils.isNullOrEmpty(extension.githubUrl)
