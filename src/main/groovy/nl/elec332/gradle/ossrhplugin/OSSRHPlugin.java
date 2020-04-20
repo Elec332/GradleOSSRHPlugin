@@ -4,6 +4,7 @@ import nl.elec332.gradle.util.GroovyHooks;
 import nl.elec332.gradle.util.JavaPluginHelper;
 import nl.elec332.gradle.util.PluginHelper;
 import nl.elec332.gradle.util.Utils;
+import org.gradle.api.JavaVersion;
 import org.gradle.api.NonNullApi;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
@@ -11,6 +12,7 @@ import org.gradle.api.internal.artifacts.mvnsettings.LocalMavenRepositoryLocator
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.MavenPlugin;
 import org.gradle.api.tasks.bundling.Jar;
+import org.gradle.api.tasks.javadoc.Javadoc;
 import org.gradle.plugins.signing.SigningExtension;
 import org.gradle.plugins.signing.SigningPlugin;
 
@@ -49,6 +51,7 @@ public class OSSRHPlugin implements Plugin<Project> {
         Jar jDoc = project.getTasks().create("javadocJar", Jar.class);
         jDoc.setClassifier("javadoc");
         jDoc.from(JavaPluginHelper.getJavaDocTask(project));
+        fixJavaDoc(project);
 
         Jar sources = project.getTasks().create("sourcesJar", Jar.class);
         sources.setClassifier("sources");
@@ -76,6 +79,23 @@ public class OSSRHPlugin implements Plugin<Project> {
             });
         }));
 
+    }
+
+    /**
+     * Due to a bug in javadoc in JDK versions up to JDK-11
+     * dependencies that have their module-info file in a multi-version package
+     * will cause a crash, because javadoc doesn't scan those locations
+     *
+     * @see <a href="https://bugs.openjdk.java.net/browse/JDK-8208269">JDK bug report</a>
+     */
+    private static void fixJavaDoc(Project project) {
+        if (JavaVersion.current().compareTo(JavaVersion.VERSION_11) <= 0) {
+            project.getGradle().getTaskGraph().whenReady(tg ->
+                    project.getTasks().withType(Javadoc.class).forEach(jDocTask ->
+                            jDocTask.exclude("*module-info.java")
+                    )
+            );
+        }
     }
 
     private String getLocalMavenProperty() {

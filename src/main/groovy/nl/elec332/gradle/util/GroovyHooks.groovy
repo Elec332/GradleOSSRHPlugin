@@ -15,7 +15,7 @@ import java.util.function.Consumer
 class GroovyHooks {
 
     static void addModelComponent(Project project, String name, Consumer<NativeLibrarySpec> lib, Consumer<NativeBinarySpec> bin) {
-        Set<NativeBinarySpec> stuff = new HashSet<>();
+        Set<NativeBinarySpec> stuff = new HashSet<>()
         project.model {
             components {
                 "$name"(NativeLibrarySpec) {
@@ -41,7 +41,7 @@ class GroovyHooks {
             }
         }
     }
-    
+
     static void addArtifact(Project project, Object from) {
         project.artifacts {
             archives from
@@ -57,5 +57,5 @@ class GroovyHooks {
             }
         }
     }
-    
+
 }
