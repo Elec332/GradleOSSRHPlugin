@@ -1,16 +1,17 @@
 package nl.elec332.gradle.ossrhplugin;
 
-import nl.elec332.gradle.util.GroovyHooks;
-import nl.elec332.gradle.util.JavaPluginHelper;
-import nl.elec332.gradle.util.PluginHelper;
-import nl.elec332.gradle.util.Utils;
+import nl.elec332.gradle.util.*;
 import org.gradle.api.JavaVersion;
 import org.gradle.api.NonNullApi;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.artifacts.ProjectDependency;
+import org.gradle.api.artifacts.maven.Conf2ScopeMappingContainer;
 import org.gradle.api.internal.artifacts.mvnsettings.LocalMavenRepositoryLocator;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.MavenPlugin;
+import org.gradle.api.plugins.MavenPluginConvention;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.api.tasks.javadoc.Javadoc;
 import org.gradle.plugins.signing.SigningExtension;
@@ -30,6 +31,7 @@ public class OSSRHPlugin implements Plugin<Project> {
     public static final String GITHUB_BASE_URL = "github.com";
     public static final String OSSRH_USERNAME_PROPERTY = "ossrh.username";
     public static final String OSSRH_PASSWORD_PROPERTY = "ossrh.password";
+    public static final String MAVEN_POM_CONFIGURATION = "mavenPom";
 
     @Inject
     public OSSRHPlugin(LocalMavenRepositoryLocator mavenRepositoryLocator) {
@@ -79,6 +81,33 @@ public class OSSRHPlugin implements Plugin<Project> {
             });
         }));
 
+        addMavenPomDeps(project, extension);
+    }
+
+    private static void addMavenPomDeps(Project project, OSSRHExtension extension) {
+        Configuration conf = project.getConfigurations().create(MAVEN_POM_CONFIGURATION);
+        project.getPlugins().withType(MavenPlugin.class, plugin -> {
+            Object conv = project.getConvention().getPlugins().get("maven");
+            if (conv instanceof MavenPluginConvention) {
+                ((MavenPluginConvention) conv).getConf2ScopeMappings().addMapping(MavenPlugin.COMPILE_PRIORITY, conf, Conf2ScopeMappingContainer.COMPILE);
+            }
+        });
+        ProjectHelper.beforeTaskGraphDone(project, () -> {
+            JavaPluginHelper.getJavaCompileTask(project).doFirst(a -> {
+                if (extension.addProjectDependencies) {
+                    ProjectHelper.getCompileConfiguration(project).getDependencies().forEach(d -> {
+                        if (d instanceof ProjectDependency) {
+                            String name = (String) ((ProjectDependency) d).getDependencyProject().property("archivesBaseName");
+                            if (name == null || name.equals("")) {
+                                name = d.getName();
+                            }
+                            project.getDependencies().add(conf.getName(), d.getGroup() + ":" + name + ":" + d.getVersion());
+                        }
+                    });
+                }
+            });
+
+        });
     }
 
     /**
