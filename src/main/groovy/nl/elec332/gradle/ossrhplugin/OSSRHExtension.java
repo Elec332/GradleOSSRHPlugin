@@ -39,9 +39,6 @@ public class OSSRHExtension {
     private final Project project;
 
     @Inject
-    public boolean addProjectDependencies = true;
-
-    @Inject
     public String repositoryUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/";
 
     @Inject

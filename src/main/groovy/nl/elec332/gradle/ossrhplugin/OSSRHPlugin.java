@@ -1,18 +1,19 @@
 package nl.elec332.gradle.ossrhplugin;
 
-import nl.elec332.gradle.util.*;
+import nl.elec332.gradle.util.JavaPluginHelper;
+import nl.elec332.gradle.util.MavenHooks;
+import nl.elec332.gradle.util.PluginHelper;
+import nl.elec332.gradle.util.Utils;
 import org.gradle.api.JavaVersion;
 import org.gradle.api.NonNullApi;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.artifacts.ProjectDependency;
-import org.gradle.api.artifacts.maven.Conf2ScopeMappingContainer;
+import org.gradle.api.artifacts.ModuleDependency;
 import org.gradle.api.internal.artifacts.mvnsettings.LocalMavenRepositoryLocator;
 import org.gradle.api.plugins.JavaPlugin;
-import org.gradle.api.plugins.MavenPlugin;
-import org.gradle.api.plugins.MavenPluginConvention;
-import org.gradle.api.tasks.bundling.Jar;
+import org.gradle.api.publish.maven.MavenPublication;
+import org.gradle.api.publish.maven.plugins.MavenPublishPlugin;
 import org.gradle.api.tasks.javadoc.Javadoc;
 import org.gradle.plugins.signing.SigningExtension;
 import org.gradle.plugins.signing.SigningPlugin;
@@ -26,6 +27,7 @@ import java.util.stream.Stream;
  * Created by Elec332 on 18-4-2020
  */
 @NonNullApi
+@SuppressWarnings("UnstableApiUsage")
 public class OSSRHPlugin implements Plugin<Project> {
 
     public static final String GITHUB_BASE_URL = "github.com";
@@ -42,31 +44,21 @@ public class OSSRHPlugin implements Plugin<Project> {
 
     @Override
     public void apply(Project project) {
-        PluginHelper.checkMinimumGradleVersion("5.0");
+        PluginHelper.checkMinimumGradleVersion("6.0");
 
         project.getPluginManager().apply(JavaPlugin.class);
-        project.getPluginManager().apply(MavenPlugin.class);
+        project.getPluginManager().apply(MavenPublishPlugin.class);
         project.getPluginManager().apply(SigningPlugin.class);
 
         OSSRHExtension extension = project.getExtensions().create("ossrh", OSSRHExtension.class, project);
 
-        Jar jDoc = project.getTasks().create("javadocJar", Jar.class);
-        jDoc.setClassifier("javadoc");
-        jDoc.from(JavaPluginHelper.getJavaDocTask(project));
-        fixJavaDoc(project);
+        JavaPluginHelper.getJavaExtension(project).withSourcesJar();
+        JavaPluginHelper.getJavaExtension(project).withJavadocJar();
 
-        Jar sources = project.getTasks().create("sourcesJar", Jar.class);
-        sources.setClassifier("sources");
-        sources.from(JavaPluginHelper.getMainJavaSourceSet(project).getAllSource());
 
-        GroovyHooks.addArtifact(project, jDoc);
-        GroovyHooks.addArtifact(project, sources);
-
-        SigningExtension signing = Objects.requireNonNull(project.getExtensions().getByType(SigningExtension.class));
-        signing.sign(project.getConfigurations().getByName("archives"));
-
-        project.afterEvaluate(a -> GroovyHooks.configureMaven(project, mavenDeployer -> {
-            mavenDeployer.beforeDeployment(signing::signPom);
+        SigningExtension signing = project.getExtensions().getByType(SigningExtension.class);
+        project.afterEvaluate(a -> MavenHooks.configureMaven(project, mavenDeployer -> {
+            signing.sign(mavenDeployer);
             MavenConfigurator.configureMaven(mavenDeployer, extension, project, () -> {
                 String ret = getLocalMavenProperty();
                 if (!Utils.isNullOrEmpty(ret)) {
@@ -79,35 +71,23 @@ public class OSSRHPlugin implements Plugin<Project> {
                 }
                 return ret;
             });
+            addMavenPomDeps(project, mavenDeployer);
         }));
 
-        addMavenPomDeps(project, extension);
+        fixJavaDoc(project);
     }
 
-    private static void addMavenPomDeps(Project project, OSSRHExtension extension) {
+    /**
+     * @see org.gradle.api.publish.maven.internal.publication.DefaultMavenPublication
+     * @see org.gradle.api.publish.maven.tasks.GenerateMavenPom
+     */
+    private static void addMavenPomDeps(Project project, MavenPublication publication) {
         Configuration conf = project.getConfigurations().create(MAVEN_POM_CONFIGURATION);
-        project.getPlugins().withType(MavenPlugin.class, plugin -> {
-            Object conv = project.getConvention().getPlugins().get("maven");
-            if (conv instanceof MavenPluginConvention) {
-                ((MavenPluginConvention) conv).getConf2ScopeMappings().addMapping(MavenPlugin.COMPILE_PRIORITY, conf, Conf2ScopeMappingContainer.COMPILE);
+        project.afterEvaluate(p -> conf.getDependencies().forEach(d -> {
+            if (d instanceof ModuleDependency) {
+                MavenHooks.addDependency(publication, (ModuleDependency) d, "compile");
             }
-        });
-        ProjectHelper.beforeTaskGraphDone(project, () -> {
-            JavaPluginHelper.getJavaCompileTask(project).doFirst(a -> {
-                if (extension.addProjectDependencies) {
-                    ProjectHelper.getCompileConfiguration(project).getDependencies().forEach(d -> {
-                        if (d instanceof ProjectDependency) {
-                            String name = (String) ((ProjectDependency) d).getDependencyProject().property("archivesBaseName");
-                            if (name == null || name.equals("")) {
-                                name = d.getName();
-                            }
-                            project.getDependencies().add(conf.getName(), d.getGroup() + ":" + name + ":" + d.getVersion());
-                        }
-                    });
-                }
-            });
-
-        });
+        }));
     }
 
     /**

@@ -1,11 +1,8 @@
 package nl.elec332.gradle.ossrhplugin
 
-import groovy.transform.VisibilityOptions
-import groovy.transform.options.Visibility
-import nl.elec332.gradle.util.GroovyHooks
-import nl.elec332.gradle.util.Utils
+import nl.elec332.gradle.util.MavenHooks
 import org.gradle.api.Project
-import org.gradle.api.artifacts.maven.MavenDeployer
+import org.gradle.api.publish.maven.MavenPublication
 
 import java.util.function.Supplier
 
@@ -15,8 +12,8 @@ import java.util.function.Supplier
 class MavenConfigurator {
 
     static void configure(Project project, Closure closure, String name) {
-        GroovyHooks.configureMaven(project, { maven ->
-            maven.pom.project {
+        MavenHooks.configureMaven(project, { maven ->
+            maven.pom {
                 "$name"(closure)
             }
         })
@@ -40,133 +37,15 @@ class MavenConfigurator {
         }, "contributors")
     }
 
-    static void configureMaven(MavenDeployer deployer, OSSRHExtension extension, Project project, Supplier<String> localMaven) {
-        validateExtension(extension, project, localMaven)
-        boolean userPass = false
-        String user, pass
-        if (project.hasProperty(OSSRHPlugin.OSSRH_USERNAME_PROPERTY) && project.hasProperty(OSSRHPlugin.OSSRH_USERNAME_PROPERTY)) {
-            userPass = true;
-            user = project.property(OSSRHPlugin.OSSRH_USERNAME_PROPERTY)
-            pass = project.property(OSSRHPlugin.OSSRH_PASSWORD_PROPERTY)
-        } else if (project.hasProperty("ossrhUsername") && project.hasProperty("ossrhPassword")) {
-            userPass = true
-            user = project.property("ossrhUsername")
-            pass = project.property("ossrhPassword")
-        }
-
-        if (!userPass) {
-            println "No credentials found..."
-        }
-
-        String repo = extension.repositoryUrl;
-        if (extension.testLocalRepo || extension.testFilter != null && extension.testFilter.test((String) project.version)) {
-            repo = extension.localRepository
-        } else if (!Utils.isNullOrEmpty(extension.snapshotRepositoryUrl)) {
-            if (extension.useSnapshotRepo) {
-                deployer.repository(url: extension.snapshotRepositoryUrl) {
-                    if (userPass) {
-                        authentication(userName: user, password: pass)
-                    }
-                }
-            } else if (extension.snapshotFilter != null && extension.snapshotFilter.test((String) project.version)) {
-                repo = extension.snapshotRepositoryUrl
-            }
-        }
-
-        deployer.repository(url: repo) {
-            if (userPass) {
-                authentication(userName: user, password: pass)
-            }
-        }
-
-        deployer.pom.project {
-            name extension.name
-            artifactId extension.artifactId
-            packaging extension.packaging
-            description extension.description
-            url extension.url
-
-            if (!Utils.isNullOrEmpty(extension.inceptionYear)) {
-                inceptionYear extension.inceptionYear
-            }
-
-            scm {
-                url extension.scmUrl
-                connection extension.scmConnection
-                developerConnection extension.scmDevConnection
-            }
-
-            if (!Utils.isNullOrEmpty(extension.githubUrl) && extension.useGithubIssues) {
-                issueManagement {
-                    system "Github"
-                    url extension.githubUrl + "/issues"
-                }
-            }
-
-        }
-
-        List test = deployer.pom.getModel().getLicenses()
+    static void configureMaven(MavenPublication deployer, OSSRHExtension extension, Project project, Supplier<String> localMaven) {
+        MavenConfiguratorJava.configureMaven(deployer, extension, project, localMaven);
+        List test = deployer.pom.getLicenses()
         if (test.isEmpty()) {
             throw new MissingPropertyException("No license(s) defined!")
         }
-        test = deployer.pom.getModel().getDevelopers()
+        test = deployer.pom.getDevelopers()
         if (test.isEmpty()) {
             throw new MissingPropertyException("No developer(s) defined!")
-        }
-    }
-
-    @VisibilityOptions(Visibility.PRIVATE)
-    static void validateExtension(OSSRHExtension extension, Project project, Supplier<String> localMaven) {
-        if (Utils.isNullOrEmpty(extension.repositoryUrl)) {
-            throw new MissingPropertyException("Maven repo URL not defined!")
-        }
-        if (Utils.isNullOrEmpty(extension.name)) {
-            extension.name = project.archivesBaseName
-        }
-        if (Utils.isNullOrEmpty(extension.artifactId)) {
-            extension.artifactId = extension.name.toLowerCase(Locale.ROOT)
-        }
-        if (Utils.isNullOrEmpty(extension.packaging)) {
-            throw new MissingPropertyException("Packaging type not defined!")
-        }
-        if (Utils.isNullOrEmpty(extension.description)) {
-            throw new MissingPropertyException("No project description provided!")
-        }
-        if (Utils.isNullOrEmpty(extension.localRepository)) {
-            extension.localRepository = localMaven.get()
-        }
-
-        boolean hasGitHub = !Utils.isNullOrEmpty(extension.githubUrl)
-        if (hasGitHub) {
-            if (!extension.githubUrl.contains(OSSRHPlugin.GITHUB_BASE_URL)) {
-                throw new IllegalArgumentException("Github URL does not contain " + OSSRHPlugin.GITHUB_BASE_URL)
-            }
-            String projectLink = extension.githubUrl.split(OSSRHPlugin.GITHUB_BASE_URL)[1]
-            if (Utils.isNullOrEmpty(extension.url)) {
-                extension.url = extension.githubUrl
-            }
-            if (Utils.isNullOrEmpty(extension.scmUrl)) {
-                extension.scmUrl = extension.githubUrl
-            }
-            if (Utils.isNullOrEmpty(extension.scmConnection)) {
-                extension.scmConnection = "scm:git:git://" + OSSRHPlugin.GITHUB_BASE_URL + projectLink + ".git"
-            }
-        }
-        if (Utils.isNullOrEmpty(extension.url)) {
-            throw new MissingPropertyException("No project URL defined!")
-        }
-        if (Utils.isNullOrEmpty(extension.scmUrl)) {
-            throw new MissingPropertyException("No SCM property defined!")
-        }
-        if (Utils.isNullOrEmpty(extension.scmConnection)) {
-            throw new MissingPropertyException("No SCM connection method defined!")
-        }
-        if (Utils.isNullOrEmpty(extension.scmDevConnection)) {
-            if (extension.scmConnection.contains("git://")) {
-                extension.scmDevConnection = extension.scmConnection.replace("git://", "ssh://git@")
-            } else {
-                throw new MissingPropertyException("No SCM developer connection method defined!")
-            }
         }
     }
 
