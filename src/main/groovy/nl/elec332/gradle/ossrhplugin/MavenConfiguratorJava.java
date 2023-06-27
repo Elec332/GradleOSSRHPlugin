@@ -1,8 +1,8 @@
 package nl.elec332.gradle.ossrhplugin;
 
 import groovy.lang.MissingPropertyException;
-import nl.elec332.gradle.util.GroovyHooks;
 import nl.elec332.gradle.util.MavenHooks;
+import nl.elec332.gradle.util.ProjectHelper;
 import nl.elec332.gradle.util.Utils;
 import org.gradle.api.Project;
 import org.gradle.api.plugins.BasePluginConvention;
@@ -37,12 +37,12 @@ public class MavenConfiguratorJava {
         }
 
         String repo = extension.repositoryUrl;
-        if (extension.testLocalRepo || extension.testFilter != null && extension.testFilter.test(GroovyHooks.getVersion(project))) {
+        if (extension.testLocalRepo || extension.testFilter != null && extension.testFilter.test(ProjectHelper.getVersion(project))) {
             repo = extension.localRepository;
         } else if (!Utils.isNullOrEmpty(extension.snapshotRepositoryUrl)) {
             if (extension.useSnapshotRepo) {
                 repo = extension.snapshotRepositoryUrl;
-            } else if (extension.snapshotFilter != null && extension.snapshotFilter.test(GroovyHooks.getVersion(project))) {
+            } else if (extension.snapshotFilter != null && extension.snapshotFilter.test(ProjectHelper.getVersion(project))) {
                 repo = extension.snapshotRepositoryUrl;
             }
         }

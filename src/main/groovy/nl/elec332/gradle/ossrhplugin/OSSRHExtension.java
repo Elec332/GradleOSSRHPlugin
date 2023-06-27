@@ -1,7 +1,8 @@
 package nl.elec332.gradle.ossrhplugin;
 
-import groovy.lang.Closure;
+import org.gradle.api.Action;
 import org.gradle.api.Project;
+import org.gradle.api.publish.maven.*;
 
 import javax.inject.Inject;
 import java.util.Locale;
@@ -92,32 +93,32 @@ public class OSSRHExtension {
     @Inject
     public String scmDevConnection;
 
-    public void license(Closure<?> closure) {
-        MavenConfigurator.configureLicense(project, closure);
+    public void license(Action<? super MavenPomLicense> closure) {
+        licenses(spec -> spec.license(closure));
     }
 
-    public void developer(Closure<?> closure) {
-        MavenConfigurator.configureDeveloper(project, closure);
+    public void developer(Action<? super MavenPomDeveloper> closure) {
+        developers(spec -> spec.developer(closure));
     }
 
-    public void contributor(Closure<?> closure) {
-        MavenConfigurator.configureContributor(project, closure);
+    public void contributor(Action<? super MavenPomContributor> closure) {
+        contributors(spec -> spec.contributor(closure));
     }
 
-    public void licenses(Closure<?> closure) {
-        MavenConfigurator.configure(project, closure, "licenses");
+    public void licenses(Action<? super MavenPomLicenseSpec> closure) {
+        MavenConfigurator.configure(project, pom -> pom.licenses(closure));
     }
 
-    public void developers(Closure<?> closure) {
-        MavenConfigurator.configure(project, closure, "developers");
+    public void developers(Action<? super MavenPomDeveloperSpec> closure) {
+        MavenConfigurator.configure(project, pom -> pom.developers(closure));
     }
 
-    public void contributors(Closure<?> closure) {
-        MavenConfigurator.configure(project, closure, "contributors");
+    public void contributors(Action<? super MavenPomContributorSpec> closure) {
+        MavenConfigurator.configure(project, pom -> pom.contributors(closure));
     }
 
-    public void issueManagement(Closure<?> closure) {
-        MavenConfigurator.configure(project, closure, "issueManagement");
+    public void issueManagement(Action<? super MavenPomIssueManagement> closure) {
+        MavenConfigurator.configure(project, pom -> pom.issueManagement(closure));
     }
 
 }

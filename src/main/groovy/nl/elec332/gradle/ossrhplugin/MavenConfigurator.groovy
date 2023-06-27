@@ -1,7 +1,9 @@
 package nl.elec332.gradle.ossrhplugin
 
 import nl.elec332.gradle.util.MavenHooks
+import org.gradle.api.Action
 import org.gradle.api.Project
+import org.gradle.api.publish.maven.MavenPom
 import org.gradle.api.publish.maven.MavenPublication
 
 import java.util.function.Supplier
@@ -11,30 +13,17 @@ import java.util.function.Supplier
  */
 class MavenConfigurator {
 
-    static void configure(Project project, Closure closure, String name) {
-        MavenHooks.configureMaven(project, { maven ->
-            maven.pom {
-                "$name"(closure)
-            }
-        })
-    }
+    static void configure(Project project, Action<MavenPom> pom) {
+        try {
+            MavenHooks.configureMaven(project, { maven ->
+                maven.pom(pom)
+            })
+        } catch(Exception e) {
+            e.printStackTrace()
+        }
+        project.dependencies {
 
-    static void configureLicense(Project project, Closure closure) {
-        configure(project, {
-            license(closure)
-        }, "licenses")
-    }
-
-    static void configureDeveloper(Project project, Closure closure) {
-        configure(project, {
-            developer(closure)
-        }, "developers")
-    }
-
-    static void configureContributor(Project project, Closure closure) {
-        configure(project, {
-            contributor(closure)
-        }, "contributors")
+        }
     }
 
     static void configureMaven(MavenPublication deployer, OSSRHExtension extension, Project project, Supplier<String> localMaven) {
